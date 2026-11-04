@@ -1,4 +1,4 @@
-DL practical 6
+#DL practical 6
 
 
 import tensorflow as tf
