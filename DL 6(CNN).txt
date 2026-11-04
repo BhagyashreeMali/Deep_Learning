@@ -1,0 +1,64 @@
+DL practical 6
+
+
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras import layers, Model
+from tensorflow.keras.datasets import cifar10
+
+# Load data
+(x_train,y_train),(x_test,y_test) = cifar10.load_data()
+x_train,y_train = x_train[:10000],y_train[:10000].flatten()
+x_test,y_test = x_test[:2000],y_test[:2000].flatten()
+
+# Pretrained MobileNetV2
+base = tf.keras.applications.MobileNetV2(
+    input_shape=(96,96,3),include_top=False,weights="imagenet")
+base.trainable = False
+
+# Build model
+i = layers.Input((32,32,3))
+x = layers.Resizing(96,96)(i)
+x = tf.keras.applications.mobilenet_v2.preprocess_input(x)
+x = base(x,training=False)
+x = layers.GlobalAveragePooling2D()(x)
+x = layers.Dense(128,activation="relu")(x)
+x = layers.Dropout(0.3)(x)
+o = layers.Dense(10,activation="softmax")(x)
+model = Model(i,o)
+
+# Initial training
+model.compile(optimizer="adam",loss="sparse_categorical_crossentropy",
+              metrics=["accuracy"])
+h1 = model.fit(x_train,y_train,epochs=5,batch_size=32,
+               validation_split=0.2)
+
+# Fine-tuning
+base.trainable = True
+for layer in base.layers[:int(len(base.layers)*0.8)]:
+    layer.trainable = False
+for layer in base.layers:
+    if isinstance(layer,layers.BatchNormalization):
+        layer.trainable = False
+
+model.compile(optimizer=tf.keras.optimizers.Adam(1e-5),
+              loss="sparse_categorical_crossentropy",metrics=["accuracy"])
+h2 = model.fit(x_train,y_train,epochs=3,batch_size=32,
+               validation_split=0.2)
+
+# Evaluation
+loss,acc = model.evaluate(x_test,y_test,verbose=0)
+print("Test loss:",loss)
+print("Test accuracy:",acc*100,"%")
+
+# Accuracy graph
+plt.plot(h1.history["accuracy"]+h2.history["accuracy"],label="Training")
+plt.plot(h1.history["val_accuracy"]+h2.history["val_accuracy"],label="Validation")
+plt.axvline(4.5,linestyle="--",label="Fine-tuning")
+plt.title("Transfer Learning and Fine-Tuning")
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend()
+plt.grid()
+plt.show()

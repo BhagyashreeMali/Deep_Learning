@@ -1,0 +1,70 @@
+DL Practical 5
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras import Sequential, layers
+
+# Dataset
+sentences = [
+    "the cat sits on the mat", "the dog sits on the rug",
+    "the cat eats fish", "the dog eats meat",
+    "a cat likes fish", "a dog likes meat"
+]
+
+# Vocabulary
+words = sorted(set(" ".join(sentences).split()))
+word_to_id = {w:i for i,w in enumerate(words)}
+id_to_word = {i:w for w,i in word_to_id.items()}
+vocab_size = len(words)
+
+# Context and target generation
+X, y = [], []
+for s in sentences:
+    ids = [word_to_id[w] for w in s.split()]
+    for i in range(len(ids)):
+        c = ids[max(0,i-2):i] + ids[i+1:i+3]
+        if c:
+            X.append(c)
+            y.append(ids[i])
+
+# Padding
+X_pad = np.zeros((len(X), 4), dtype="int32")
+for i,c in enumerate(X):
+    X_pad[i,:len(c)] = np.array(c) + 1
+
+# CBOW model
+model = Sequential([
+    layers.Embedding(vocab_size+1, 16, mask_zero=True),
+    layers.GlobalAveragePooling1D(),
+    layers.Dense(vocab_size, activation="softmax")
+])
+
+model.compile(optimizer="adam",
+              loss="sparse_categorical_crossentropy",
+              metrics=["accuracy"])
+
+# Training
+history = model.fit(X_pad, np.array(y), epochs=100,
+                    batch_size=16, verbose=0)
+
+print("Training completed")
+print("Accuracy:", history.history["accuracy"][-1] * 100)
+
+# Predict target word
+context = ["cat", "on", "mat"]
+ids = [word_to_id[w]+1 for w in context if w in word_to_id]
+padded = np.zeros((1,4), dtype="int32")
+padded[0,:len(ids)] = ids[:4]
+
+prediction = model.predict(padded, verbose=0)
+print("Context:", context)
+print("Predicted word:", id_to_word[np.argmax(prediction)])
+
+# Training loss graph
+plt.plot(history.history["loss"])
+plt.title("CBOW Training Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.grid()
+plt.show()
