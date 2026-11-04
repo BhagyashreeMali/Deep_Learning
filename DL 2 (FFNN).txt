@@ -1,4 +1,4 @@
-DL practical 2
+#DL practical 2
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
